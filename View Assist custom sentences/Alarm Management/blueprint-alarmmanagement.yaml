@@ -1,0 +1,150 @@
+blueprint:
+  name: View Assist - Alarm management
+  description: Ask Assist to set an alarm and turn it off (View Assist alarmmanagement
+    v 1.0.0)
+  domain: automation
+  input:
+    command_setalarm:
+      name: Command Text Set alarm
+      description: The phrase you want to use to trigger adding an alarm
+      default: Set an alarm for {time}
+    command_turnoff:
+      name: Command Text Turn off alarm
+      description: The phrase you want to use to trigger stopping the ringing alarm
+      default: Turn off alarm
+    command_remove:
+      name: Command Text Remove alarm
+      description: The phrase you want to use to trigger removing a scheduled alarm
+        (not yet implemented)
+      default: Cancel {time} alarm
+    group_entity:
+      name: Group Entity
+      description: The group that holds the list of View Assist satellites(example
+        group.viewassist_satellites)
+      selector:
+        entity:
+          filter:
+          - domain:
+            - group
+          multiple: false
+      default: group.viewassist_satellites
+    calendar_entity:
+      name: Calendar Entity
+      description: The Home Assistant calendar to use for storing alarms (example
+        calendar.viewassist)
+      selector:
+        entity:
+          filter:
+          - domain:
+            - calendar
+          multiple: false
+      default: calendar.viewassist
+    alarmsound_path:
+      name: Alarm sound path
+      description: The path to a sound file to use as the attention device when the
+        alarm is ringing
+      default: http://192.168.0.25:8123/local/viewassist/alarm1.mp3
+  source_url: https://raw.githubusercontent.com/dinki/View-Assist/dev/View Assist
+    custom sentences/Alarm Management/blueprint-alarmmanagement.yaml
+alias: View Assist - Alarm Management
+description: ''
+trigger:
+- platform: conversation
+  command:
+  - !input command_setalarm
+  id: setalarm
+- platform: state
+  entity_id:
+  - !input calendar_entity
+  enabled: true
+  to: 'on'
+  id: ringalarm
+- platform: conversation
+  command:
+  - !input command_turnoff
+  id: turnoffalarm
+condition: []
+action:
+- choose:
+  - conditions:
+    - condition: trigger
+      id:
+      - setalarm
+    sequence:
+    - set_conversation_response: Alarm set for {{trigger.slots.time}}
+    - variables:
+        target_satellite_device: "{% for sat in expand(group_entity) %}\n  {% if (device_id(sat.attributes.mic_device)
+          \ == trigger.device_id) or (device_id(sat.attributes.display_device)  ==
+          trigger.device_id) %}\n    {{ sat.entity_id }}\n  {% endif %}\n{% endfor
+          %}"
+        target_display_device: '{{ device_id(state_attr(target_satellite_device, ''display_device''))
+          }}'
+        target_mediaplayer_device: '{{ state_attr(target_satellite_device, ''mediaplayer_device'')
+          }}'
+      enabled: true
+    - service: calendar.create_event
+      target:
+        entity_id: '{{ calendar_entity }}'
+      data:
+        summary: ASSISTALARM,{{target_satellite_device}}
+        start_date_time: '{{strptime(today_at().date() ~ '' '' ~ trigger.slots.time,
+          ''%Y-%m-%d %I:%M %p'')}}'
+        end_date_time: '{{strptime(today_at().date() ~ '' '' ~ trigger.slots.time,
+          ''%Y-%m-%d %I:%M %p'') + timedelta(minutes=1)}}'
+      enabled: true
+  - conditions:
+    - condition: trigger
+      id:
+      - ringalarm
+    sequence:
+    - variables:
+        target_satellite_device: '{{state_attr(calendar_entity,''message'').split('','')[1]}}'
+        target_display_device: '{{ device_id (state_attr(target_satellite_device,
+          ''display_device'')) }}'
+        target_mediaplayer_device: '{{state_attr(target_satellite_device, ''mediaplayer_device'')}}'
+      enabled: true
+    - service: python_script.set_state
+      data:
+        entity_id: '{{ target_satellite_device }}'
+        alarm: active
+    - repeat:
+        sequence:
+        - service: media_extractor.play_media
+          data:
+            media_content_id: '{{ alarmsound_path }}'
+            media_content_type: MUSIC
+          target:
+            entity_id: '{{ target_mediaplayer_device }}'
+          enabled: true
+        - wait_template: '{{ states(target_mediaplayer_device) == ''idle''}}'
+          continue_on_timeout: true
+        while:
+        - condition: template
+          value_template: '{{state_attr(target_satellite_device,''alarm'') == ''active''}}'
+  - conditions:
+    - condition: trigger
+      id:
+      - turnoffalarm
+    sequence:
+    - variables:
+        target_satellite_device: "{% for sat in expand(group_entity) %}\n  {% if (device_id(sat.attributes.mic_device)
+          \ == trigger.device_id) or (device_id(sat.attributes.display_device)  ==
+          trigger.device_id) %}\n    {{ sat.entity_id }}\n  {% endif %}\n{% endfor
+          %}"
+        target_display_device: '{{ device_id(state_attr(target_satellite_device, ''display_device''))
+          }}'
+        target_mediaplayer_device: '{{ state_attr(target_satellite_device, ''mediaplayer_device'')
+          }}'
+        target_satellite_device_type: '{{ state_attr(target_satellite_device, ''type'')
+          }}'
+      enabled: true
+    - service: python_script.set_state
+      data:
+        entity_id: '{{ target_satellite_device }}'
+        alarm: idle
+    - set_conversation_response: ' '
+variables:
+  group_entity: !input group_entity
+  calendar_entity: !input calendar_entity
+  alarmsound_path: !input alarmsound_path
+mode: single

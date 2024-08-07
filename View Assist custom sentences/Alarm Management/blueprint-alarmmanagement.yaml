@@ -62,7 +62,7 @@ trigger:
 - platform: conversation
   command:
   - !input command_turnoff
-  id: turnoffalarm
+  id: stopalarm
 condition: []
 action:
 - choose:
@@ -109,7 +109,7 @@ action:
         alarm: active
     - repeat:
         sequence:
-        - service: media_extractor.play_media
+        - service: media_player.play_media
           data:
             media_content_id: '{{ alarmsound_path }}'
             media_content_type: MUSIC
@@ -124,7 +124,7 @@ action:
   - conditions:
     - condition: trigger
       id:
-      - turnoffalarm
+      - stopalarm
     sequence:
     - variables:
         target_satellite_device: "{% for sat in expand(group_entity) %}\n  {% if (device_id(sat.attributes.mic_device)
@@ -147,4 +147,4 @@ variables:
   group_entity: !input group_entity
   calendar_entity: !input calendar_entity
   alarmsound_path: !input alarmsound_path
-mode: single
+mode: parallel

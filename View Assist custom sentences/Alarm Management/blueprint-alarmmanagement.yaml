@@ -112,7 +112,7 @@ action:
         - service: media_player.play_media
           data:
             media_content_id: '{{ alarmsound_path }}'
-            media_content_type: MUSIC
+            media_content_type: music
           target:
             entity_id: '{{ target_mediaplayer_device }}'
           enabled: true

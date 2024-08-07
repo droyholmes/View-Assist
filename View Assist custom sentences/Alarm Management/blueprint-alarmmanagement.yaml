@@ -142,6 +142,11 @@ action:
       data:
         entity_id: '{{ target_satellite_device }}'
         alarm: idle
+    - service: media_player.media_stop
+      target:
+        entity_id:
+          - "{{ target_mediaplayer_device }}"
+      data: {}        
     - set_conversation_response: ' '
 variables:
   group_entity: !input group_entity

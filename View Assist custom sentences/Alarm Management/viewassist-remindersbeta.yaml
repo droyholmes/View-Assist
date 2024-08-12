@@ -1,0 +1,303 @@
+# Thanks to Mr. Picc010 for this WIP
+alias: View Assist- Reminders BETA
+description: ""
+trigger:
+  - platform: conversation
+    command:
+      - remind me to {thing} in {when}
+      - remind me in {when} to {thing}
+    id: setreminder
+  - platform: state
+    entity_id:
+      - calendar.reminders
+    enabled: true
+    to: "on"
+    id: ringalarm
+  - platform: conversation
+    command:
+      - Turn off reminder
+      - Dismiss [the] [my] reminder
+    id: turnoff
+  - platform: event
+    event_type: call_service
+    event_data:
+      domain: python_script
+      service: set_state
+      service_data:
+        entity_id: THIS
+        alarm: snooze
+    id: snooze
+  - platform: event
+    event_type: call_service
+    id: dismiss
+    event_data:
+      domain: python_script
+      service: set_state
+      service_data:
+        entity_id: THIS
+        alarm: dismiss
+  - platform: conversation
+    command:
+      - Snooze [the] [my] reminder
+    id: snooze_voice
+  - platform: conversation
+    command: remind me again in {time} {modifier}
+condition: []
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id:
+              - setreminder
+        sequence:
+          - set_conversation_response: >-
+              {{trigger.slots.thing}} reminder set for {{trigger.slots.when}}
+              from now.
+          - variables:
+              target_satellite_device: |-
+                {% for sat in expand(group_entity) %}
+                  {% if (device_id(sat.attributes.mic_device)  == trigger.device_id) or (device_id(sat.attributes.display_device)  == trigger.device_id) %}
+                    {{ sat.entity_id }}
+                  {% endif %}
+                {% endfor %}
+              target_display_device: >-
+                {{ device_id(state_attr(target_satellite_device,
+                'display_device')) }}
+              target_mediaplayer_device: "{{ state_attr(target_satellite_device, 'mediaplayer_device') }}"
+              var_time: "{{(trigger.slots.when).split(' ')[0]}}"
+              var_modifier: "{{(trigger.slots.when).split(' ')[1]}}"
+              var_time_int: |
+                {% set word = var_time %}
+                {% set mapping = {
+                  'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+                  'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15, 'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20,
+                  'twenty-one': 21, 'twenty-two': 22, 'twenty-three': 23, 'twenty-four': 24, 'twenty-five': 25, 'twenty-six': 26, 'twenty-seven': 27, 'twenty-eight': 28, 'twenty-nine': 29, 'thirty': 30,
+                  'thirty-one': 31, 'thirty-two': 32, 'thirty-three': 33, 'thirty-four': 34, 'thirty-five': 35, 'thirty-six': 36, 'thirty-seven': 37, 'thirty-eight': 38, 'thirty-nine': 39, 'forty': 40,
+                  'forty-one': 41, 'forty-two': 42, 'forty-three': 43, 'forty-four': 44, 'forty-five': 45, 'forty-six': 46, 'forty-seven': 47, 'forty-eight': 48, 'forty-nine': 49, 'fifty': 50,
+                  'fifty-one': 51, 'fifty-two': 52, 'fifty-three': 53, 'fifty-four': 54, 'fifty-five': 55, 'fifty-six': 56, 'fifty-seven': 57, 'fifty-eight': 58, 'fifty-nine': 59, 'sixty': 60,
+                  'sixty-one': 61, 'sixty-two': 62, 'sixty-three': 63, 'sixty-four': 64, 'sixty-five': 65, 'sixty-six': 66, 'sixty-seven': 67, 'sixty-eight': 68, 'sixty-nine': 69, 'seventy': 70,
+                  'seventy-one': 71, 'seventy-two': 72, 'seventy-three': 73, 'seventy-four': 74, 'seventy-five': 75, 'seventy-six': 76, 'seventy-seven': 77, 'seventy-eight': 78, 'seventy-nine': 79, 'eighty': 80,
+                  'eighty-one': 81, 'eighty-two': 82, 'eighty-three': 83, 'eighty-four': 84, 'eighty-five': 85, 'eighty-six': 86, 'eighty-seven': 87, 'eighty-eight': 88, 'eighty-nine': 89, 'ninety': 90,
+                  'ninety-one': 91, 'ninety-two': 92, 'ninety-three': 93, 'ninety-four': 94, 'ninety-five': 95, 'ninety-six': 96, 'ninety-seven': 97, 'ninety-eight': 98, 'ninety-nine': 99, 'one hundred': 100
+                } %}
+                {{ mapping[word] if word in mapping else word }}
+            enabled: true
+          - service: calendar.create_event
+            target:
+              entity_id: "{{ calendar_entity }}"
+            data:
+              summary: >-
+                ASSISTREMINDER,{{trigger.slots.thing}},{{target_satellite_device}}
+              start_date_time: >-
+                {% set time = var_time_int | int %} {% set modifier =
+                var_modifier %} {% set now = now() %} {% set modifiers = {
+                    'minute': 'minutes', 'minutes': 'minutes',
+                    'hour': 'hours', 'hours': 'hours',
+                    'day': 'days', 'days': 'days',
+                    'week': 'weeks', 'weeks': 'weeks',
+                    'month': 'months', 'months': 'months',
+                    'year': 'years', 'years': 'years'
+                } %} {% set mod = modifiers.get(modifier, 'invalid') %} {% if
+                mod == 'minutes' %}
+                  {{ (now + timedelta(minutes=time)).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'hours' %}
+                  {{ (now + timedelta(hours=time)).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'days' %}
+                  {{ (now + timedelta(days=time)).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'weeks' %}
+                  {{ (now + timedelta(weeks=time)).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'months' %}
+                  {{ (now + timedelta(weeks=(time*4))).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'years' %}
+                  {{ (now + timedelta(days=(time*365))).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% else %}
+                  Invalid modifier
+                {% endif %}
+              end_date_time: >-
+                {% set time = var_time_int | int %} {% set modifier =
+                var_modifier %} {% set now = now() %} {% set modifiers = {
+                    'minute': 'minutes', 'minutes': 'minutes',
+                    'hour': 'hours', 'hours': 'hours',
+                    'day': 'days', 'days': 'days',
+                    'week': 'weeks', 'weeks': 'weeks',
+                    'month': 'months', 'months': 'months',
+                    'year': 'years', 'years': 'years'
+                } %} {% set mod = modifiers.get(modifier, 'invalid') %} {% if
+                mod == 'minutes' %}
+                  {{ (now + timedelta(minutes=time,seconds=60) ).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'hours' %}
+                  {{ (now + timedelta(hours=time,minutes=1)).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'days' %}
+                  {{ (now + timedelta(days=time,minutes=1)).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'weeks' %}
+                  {{ (now + timedelta(weeks=time,minutes=1)).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'months' %}
+                  {{ (now + timedelta(weeks=(time*4),minutes=1)).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% elif mod == 'years' %}
+                  {{ (now + timedelta(days=(time*365),minutes=1)).strftime('%Y-%m-%d %H:%M:%S') }}
+                {% else %}
+                  Invalid modifier
+                {% endif %}
+            enabled: true
+      - conditions:
+          - condition: trigger
+            id:
+              - ringalarm
+        sequence:
+          - parallel:
+              - sequence:
+                  - variables:
+                      target_satellite_device: "{{state_attr(calendar_entity,'message').split(',')[2]}}"
+                      target_display_device: >-
+                        {{ device_id (state_attr(target_satellite_device,
+                        'display_device')) }}
+                      target_mediaplayer_device: >-
+                        {{state_attr(target_satellite_device,
+                        'mediaplayer_device')}}
+                      reminder_thing: "{{state_attr(calendar_entity,'message').split(',')[1]}}"
+                      alarm_time: >
+                        {% set start_time = '2024-08-08 13:09:39' %}
+
+                        {{ as_timestamp(start_time) | timestamp_custom('%I:%M
+                        %p') }}
+                    enabled: true
+                  - service: browser_mod.popup
+                    data:
+                      content: >-
+                        Your {{ alarm_time }} Alarm Triggered, Snooze or
+                        Dismiss?
+                      right_button: Dismiss
+                      size: fullscreen
+                      left_button: Snooze
+                      right_button_action:
+                        service: python_script.set_state
+                        data:
+                          entity_id: THIS
+                          alarm: dismiss
+                      left_button_action:
+                        service: python_script.set_state
+                        data:
+                          entity_id: THIS
+                          alarm: snooze
+                      browser_id: "{{ state_attr(target_satellite_device, 'browser_id') }}"
+              - sequence:
+                  - variables:
+                      target_satellite_device: "{{state_attr(calendar_entity,'message').split(',')[1]}}"
+                      target_display_device: >-
+                        {{ device_id (state_attr(target_satellite_device,
+                        'display_device')) }}
+                      target_mediaplayer_device: >-
+                        {{state_attr(target_satellite_device,
+                        'mediaplayer_device')}}
+                    enabled: true
+                  - service: python_script.set_state
+                    data:
+                      entity_id: "{{ target_satellite_device }}"
+                      alarm: active
+                  - repeat:
+                      sequence:
+                        - service: media_player.play_media
+                          data:
+                            media_content_id: "{{ alarmsound_path }}"
+                            media_content_type: music
+                          target:
+                            entity_id: >-
+                              {{state_attr(target_satellite_device,
+                              'mediaplayer_device')}}
+                          enabled: true
+                        - wait_template: "{{ states(target_mediaplayer_device) == 'idle'}}"
+                          continue_on_timeout: true
+                      while:
+                        - condition: template
+                          value_template: >-
+                            {{state_attr(target_satellite_device,'alarm') ==
+                            'active'}}
+      - conditions:
+          - condition: trigger
+            id:
+              - turnoff
+        sequence:
+          - variables:
+              target_satellite_device: |-
+                {% for sat in expand(group_entity) %}
+                  {% if (device_id(sat.attributes.mic_device)  == trigger.device_id) or (device_id(sat.attributes.display_device)  == trigger.device_id) %}
+                    {{ sat.entity_id }}
+                  {% endif %}
+                {% endfor %}
+              target_display_device: >-
+                {{ device_id(state_attr(target_satellite_device,
+                'display_device')) }}
+              target_mediaplayer_device: "{{ state_attr(target_satellite_device, 'mediaplayer_device') }}"
+              target_satellite_device_type: "{{ state_attr(target_satellite_device, 'type') }}"
+            enabled: true
+          - service: python_script.set_state
+            data:
+              entity_id: "{{ target_satellite_device }}"
+              alarm: idle
+          - service: media_player.media_stop
+            target:
+              entity_id: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
+            data: {}
+          - set_conversation_response: " "
+      - conditions:
+          - condition: trigger
+            id:
+              - snooze
+              - snooze_voice
+        sequence:
+          - variables:
+              target_satellite_device: "{{state_attr(calendar_entity,'message').split(',')[1]}}"
+              target_display_device: >-
+                {{ device_id (state_attr(target_satellite_device,
+                'display_device')) }}
+              target_mediaplayer_device: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
+            enabled: true
+          - service: calendar.create_event
+            target:
+              entity_id: "{{ calendar_entity }}"
+            data:
+              summary: ASSISTALARM,{{target_satellite_device}}
+              start_date_time: >-
+                {{ (now() + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+                }}
+              end_date_time: >-
+                {{ (now() + timedelta(minutes=6)).strftime('%Y-%m-%d %H:%M:%S')
+                }}
+          - service: python_script.set_state
+            data:
+              entity_id: "{{ target_satellite_device }}"
+              alarm: idle
+          - service: media_player.media_stop
+            target:
+              entity_id: "{{ target_mediaplayer_device }}"
+            data: {}
+          - service: browser_mod.close_popup
+            data:
+              browser_id: "{{ state_attr(target_satellite_device, 'browser_id') }}"
+          - set_conversation_response: " "
+      - conditions:
+          - condition: trigger
+            id:
+              - dismiss
+        sequence:
+          - variables:
+              target_satellite_device: "{{state_attr(calendar_entity,'message').split(',')[1]}}"
+              target_display_device: >-
+                {{ device_id (state_attr(target_satellite_device,
+                'display_device')) }}
+              target_mediaplayer_device: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
+            enabled: true
+          - service: python_script.set_state
+            data:
+              entity_id: "{{ target_satellite_device }}"
+              alarm: idle
+          - service: media_player.media_stop
+            target:
+              entity_id: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
+            data: {}
+          - set_conversation_response: " "
+mode: parallel
+variables:
+  group_entity: group.viewassist_satellites
+  calendar_entity: calendar.reminders
+  alarmsound_path: http://192.168.10.80:8123/local/Sounds/WhiteNoise.mp3

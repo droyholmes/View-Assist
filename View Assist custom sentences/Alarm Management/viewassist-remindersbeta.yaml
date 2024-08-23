@@ -1,4 +1,3 @@
-# Thanks to Mr. Picc010 for this WIP
 alias: View Assist- Reminders BETA
 description: ""
 trigger:
@@ -42,6 +41,18 @@ trigger:
     id: snooze_voice
   - platform: conversation
     command: remind me again in {time} {modifier}
+  - platform: conversation
+    command:
+      - Remind me on {date} at {time} to {thing}
+      - Remind me to {thing} on {date} at {time}
+      - Remind me at {time} on {date} to {thing}
+    id: Remind- Date and Time
+  - platform: conversation
+    command:
+      - Remind me on {date} to {thing}
+      - Remind me to {thing} on {date}
+      - Remind me on {date} to {thing}
+    id: Remind- Date no Time
 condition: []
 action:
   - choose:
@@ -82,8 +93,7 @@ action:
                 } %}
                 {{ mapping[word] if word in mapping else word }}
             enabled: true
-          - service: calendar.create_event
-            target:
+          - target:
               entity_id: "{{ calendar_entity }}"
             data:
               summary: >-
@@ -139,6 +149,7 @@ action:
                   Invalid modifier
                 {% endif %}
             enabled: true
+            action: calendar.create_event
       - conditions:
           - condition: trigger
             id:
@@ -161,8 +172,7 @@ action:
                         {{ as_timestamp(start_time) | timestamp_custom('%I:%M
                         %p') }}
                     enabled: true
-                  - service: browser_mod.popup
-                    data:
+                  - data:
                       content: >-
                         Your {{ alarm_time }} Alarm Triggered, Snooze or
                         Dismiss?
@@ -180,6 +190,7 @@ action:
                           entity_id: THIS
                           alarm: snooze
                       browser_id: "{{ state_attr(target_satellite_device, 'browser_id') }}"
+                    action: browser_mod.popup
               - sequence:
                   - variables:
                       target_satellite_device: "{{state_attr(calendar_entity,'message').split(',')[1]}}"
@@ -190,14 +201,13 @@ action:
                         {{state_attr(target_satellite_device,
                         'mediaplayer_device')}}
                     enabled: true
-                  - service: python_script.set_state
-                    data:
+                  - data:
                       entity_id: "{{ target_satellite_device }}"
                       alarm: active
+                    action: python_script.set_state
                   - repeat:
                       sequence:
-                        - service: media_player.play_media
-                          data:
+                        - data:
                             media_content_id: "{{ alarmsound_path }}"
                             media_content_type: music
                           target:
@@ -205,6 +215,7 @@ action:
                               {{state_attr(target_satellite_device,
                               'mediaplayer_device')}}
                           enabled: true
+                          action: media_player.play_media
                         - wait_template: "{{ states(target_mediaplayer_device) == 'idle'}}"
                           continue_on_timeout: true
                       while:
@@ -230,14 +241,14 @@ action:
               target_mediaplayer_device: "{{ state_attr(target_satellite_device, 'mediaplayer_device') }}"
               target_satellite_device_type: "{{ state_attr(target_satellite_device, 'type') }}"
             enabled: true
-          - service: python_script.set_state
-            data:
+          - data:
               entity_id: "{{ target_satellite_device }}"
               alarm: idle
-          - service: media_player.media_stop
-            target:
+            action: python_script.set_state
+          - target:
               entity_id: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
             data: {}
+            action: media_player.media_stop
           - set_conversation_response: " "
       - conditions:
           - condition: trigger
@@ -252,8 +263,7 @@ action:
                 'display_device')) }}
               target_mediaplayer_device: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
             enabled: true
-          - service: calendar.create_event
-            target:
+          - target:
               entity_id: "{{ calendar_entity }}"
             data:
               summary: ASSISTALARM,{{target_satellite_device}}
@@ -263,17 +273,18 @@ action:
               end_date_time: >-
                 {{ (now() + timedelta(minutes=6)).strftime('%Y-%m-%d %H:%M:%S')
                 }}
-          - service: python_script.set_state
-            data:
+            action: calendar.create_event
+          - data:
               entity_id: "{{ target_satellite_device }}"
               alarm: idle
-          - service: media_player.media_stop
-            target:
+            action: python_script.set_state
+          - target:
               entity_id: "{{ target_mediaplayer_device }}"
             data: {}
-          - service: browser_mod.close_popup
-            data:
+            action: media_player.media_stop
+          - data:
               browser_id: "{{ state_attr(target_satellite_device, 'browser_id') }}"
+            action: browser_mod.close_popup
           - set_conversation_response: " "
       - conditions:
           - condition: trigger
@@ -287,15 +298,231 @@ action:
                 'display_device')) }}
               target_mediaplayer_device: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
             enabled: true
-          - service: python_script.set_state
-            data:
+          - data:
               entity_id: "{{ target_satellite_device }}"
               alarm: idle
-          - service: media_player.media_stop
-            target:
+            action: python_script.set_state
+          - target:
               entity_id: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
             data: {}
+            action: media_player.media_stop
           - set_conversation_response: " "
+      - conditions:
+          - condition: trigger
+            id:
+              - Remind- Date and Time
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{trigger.slots.date in ['monday', 'tuesday', 'wednesday',
+                      'thursday', 'friday', 'saturday', 'sunday']}}
+                sequence:
+                  - variables:
+                      target_satellite_device: |-
+                        {% for sat in expand(group_entity) %}
+                          {% if (device_id(sat.attributes.mic_device)  == trigger.device_id) or (device_id(sat.attributes.display_device)  == trigger.device_id) %}
+                            {{ sat.entity_id }}
+                          {% endif %}
+                        {% endfor %}
+                      target_display_device: >-
+                        {{ device_id(state_attr(target_satellite_device,
+                        'display_device')) }}
+                      target_mediaplayer_device: >-
+                        {{ state_attr(target_satellite_device,
+                        'mediaplayer_device') }}
+                      var_deltadays: >-
+                        {% set days =
+                        ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] 
+                        %} {% set day_to_find = trigger.slots.date %} {% set
+                        position = days.index(day_to_find) %} {% set
+                        today_position = now().weekday() %} {% set days_until =
+                        (position - today_position) if (position -
+                        today_position) >= 0 else (position - today_position +
+                        7) %} {{ days_until }}
+                    enabled: true
+                  - set_conversation_response: >-
+                      Ok, I will remind you to {{trigger.slots.thing}} at
+                      {{trigger.slots.time}} on {{trigger.slots.date}}.
+                  - target:
+                      entity_id: "{{ calendar_entity }}"
+                    data:
+                      summary: >-
+                        ASSISTREMINDER,{{trigger.slots.thing}},{{target_satellite_device}}
+                      start_date_time: >-
+                        {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                        '%Y-%m-%d %I:%M %p') + timedelta(days=var_deltadays)}}
+                      end_date_time: >-
+                        {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                        '%Y-%m-%d %I:%M %p') +
+                        timedelta(days=var_deltadays,minutes=1)}}
+                    action: calendar.create_event
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ not (trigger.slots.date in ['monday', 'tuesday',
+                      'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])
+                      }}
+                sequence:
+                  - variables:
+                      target_satellite_device: |-
+                        {% for sat in expand(group_entity) %}
+                          {% if (device_id(sat.attributes.mic_device)  == trigger.device_id) or (device_id(sat.attributes.display_device)  == trigger.device_id) %}
+                            {{ sat.entity_id }}
+                          {% endif %}
+                        {% endfor %}
+                      target_display_device: >-
+                        {{ device_id(state_attr(target_satellite_device,
+                        'display_device')) }}
+                      target_mediaplayer_device: >-
+                        {{ state_attr(target_satellite_device,
+                        'mediaplayer_device') }}
+                      var_date: >-
+                        {% set input_date = trigger.slots.date %}
+
+                        {% set parsed_date = strptime(input_date[:-2], "%B %d")
+                        %}
+
+                        {% set current_date = now() %}
+
+                        {% set year = current_date.year %}
+
+                        {% if parsed_date.month < current_date.month or
+                        (parsed_date.month == current_date.month and
+                        parsed_date.day < current_date.day) %}
+
+                        {% set year = year + 1 %}
+
+                        {% endif %}
+
+                        {% set future_date = parsed_date.replace(year=year) %}
+
+                        {{ future_date.strftime("%Y-%-m-%-d") }}
+                    enabled: true
+                  - set_conversation_response: >-
+                      Ok, I will remind you to {{trigger.slots.thing}} at
+                      {{trigger.slots.time}} on {{trigger.slots.date}}.
+                  - target:
+                      entity_id: "{{ calendar_entity }}"
+                    data:
+                      summary: >-
+                        ASSISTREMINDER,{{trigger.slots.thing}},{{target_satellite_device}}
+                      start_date_time: >-
+                        {{strptime(var_date ~ ' ' ~ trigger.slots.time,
+                        '%Y-%m-%d %I:%M %p')}}
+                      end_date_time: >-
+                        {{strptime(var_date ~ ' ' ~ trigger.slots.time,
+                        '%Y-%m-%d %I:%M %p') + timedelta(minutes=1)}}
+                    action: calendar.create_event
+      - conditions:
+          - condition: trigger
+            id:
+              - Remind- Date no Time
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{trigger.slots.date in ['monday', 'tuesday', 'wednesday',
+                      'thursday', 'friday', 'saturday', 'sunday']}}
+                sequence:
+                  - variables:
+                      target_satellite_device: |-
+                        {% for sat in expand(group_entity) %}
+                          {% if (device_id(sat.attributes.mic_device)  == trigger.device_id) or (device_id(sat.attributes.display_device)  == trigger.device_id) %}
+                            {{ sat.entity_id }}
+                          {% endif %}
+                        {% endfor %}
+                      target_display_device: >-
+                        {{ device_id(state_attr(target_satellite_device,
+                        'display_device')) }}
+                      target_mediaplayer_device: >-
+                        {{ state_attr(target_satellite_device,
+                        'mediaplayer_device') }}
+                      var_deltadays: >-
+                        {% set days =
+                        ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'] 
+                        %} {% set day_to_find = trigger.slots.date %} {% set
+                        position = days.index(day_to_find) %} {% set
+                        today_position = now().weekday() %} {% set days_until =
+                        (position - today_position) if (position -
+                        today_position) >= 0 else (position - today_position +
+                        7) %} {{ days_until }}
+                    enabled: true
+                  - set_conversation_response: >-
+                      Ok, I will remind you to {{trigger.slots.thing}} at noon
+                      on {{trigger.slots.date}}.
+                  - target:
+                      entity_id: "{{ calendar_entity }}"
+                    data:
+                      summary: >-
+                        ASSISTREMINDER,{{trigger.slots.thing}},{{target_satellite_device}}
+                      start_date_time: >-
+                        {{strptime(today_at().date() ~ ' ' ~ ' 12:00 PM',
+                        '%Y-%m-%d %I:%M %p') + timedelta(days=var_deltadays)}}
+                      end_date_time: >-
+                        {{strptime(today_at().date() ~ ' ' ~ ' 12:00 PM',
+                        '%Y-%m-%d %I:%M %p') +
+                        timedelta(days=var_deltadays,minutes=1)}}
+                    action: calendar.create_event
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ not (trigger.slots.date in ['monday', 'tuesday',
+                      'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])
+                      }}
+                sequence:
+                  - variables:
+                      target_satellite_device: |-
+                        {% for sat in expand(group_entity) %}
+                          {% if (device_id(sat.attributes.mic_device)  == trigger.device_id) or (device_id(sat.attributes.display_device)  == trigger.device_id) %}
+                            {{ sat.entity_id }}
+                          {% endif %}
+                        {% endfor %}
+                      target_display_device: >-
+                        {{ device_id(state_attr(target_satellite_device,
+                        'display_device')) }}
+                      target_mediaplayer_device: >-
+                        {{ state_attr(target_satellite_device,
+                        'mediaplayer_device') }}
+                      var_date: >-
+                        {% set input_date = trigger.slots.date %}
+
+                        {% set parsed_date = strptime(input_date[:-2], "%B %d")
+                        %}
+
+                        {% set current_date = now() %}
+
+                        {% set year = current_date.year %}
+
+                        {% if parsed_date.month < current_date.month or
+                        (parsed_date.month == current_date.month and
+                        parsed_date.day < current_date.day) %}
+
+                        {% set year = year + 1 %}
+
+                        {% endif %}
+
+                        {% set future_date = parsed_date.replace(year=year) %}
+
+                        {{ future_date.strftime("%Y-%-m-%-d") }}
+                    enabled: true
+                  - set_conversation_response: >-
+                      Ok, I will remind you to {{trigger.slots.thing}} at noon
+                      on {{trigger.slots.date}}.
+                  - target:
+                      entity_id: "{{ calendar_entity }}"
+                    data:
+                      summary: >-
+                        ASSISTREMINDER,{{trigger.slots.thing}},{{target_satellite_device}}
+                      start_date_time: >-
+                        {{strptime(var_date ~ ' ' ~ ' 12:00 PM', '%Y-%m-%d %I:%M
+                        %p')}}
+                      end_date_time: >-
+                        {{strptime(var_date ~ ' ' ~ ' 12:00 PM', '%Y-%m-%d %I:%M
+                        %p') + timedelta(minutes=1)}}
+                    action: calendar.create_event
 mode: parallel
 variables:
   group_entity: group.viewassist_satellites

@@ -63,7 +63,7 @@ custom_fields:
         action: call-service
         service: python_script.set_state
         service_data:
-          mode: normal
+          alarm: snooze
           entity_id: '[[[ return variables.var_assistsat_entity ]]]'
       styles:
         card:

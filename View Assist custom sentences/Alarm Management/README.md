@@ -9,3 +9,10 @@ Set an alarm by voice.
 Requirements:
 * Calendar to hold alarm schedules
 * Sound file to play as alarm sound
+
+## To do
+
+* Combine alarm and reminder
+* Hook snooze button with automation (tap action sends event that can be received?)
+* Update view so that it shows reminder information
+* Update alarm view to show upcoming alarm and time

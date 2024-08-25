@@ -150,6 +150,7 @@ action:
       data:
         entity_id: '{{ target_satellite_device }}'
         alarm: active
+        mode: alarm
     - repeat:
         sequence:
         - service: media_player.play_media

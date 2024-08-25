@@ -52,8 +52,6 @@ blueprint:
       description: The path to a sound file to use as the attention device when the
         alarm is ringing
       default: http://192.168.0.25:8123/local/viewassist/alarm1.mp3
-  source_url: https://raw.githubusercontent.com/dinki/View-Assist/dev/View Assist
-    custom sentences/Alarm Management/blueprint-alarmmanagement.yaml
 alias: View Assist - Alarm Management
 description: ''
 trigger:

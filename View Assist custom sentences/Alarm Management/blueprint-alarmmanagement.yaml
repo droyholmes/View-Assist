@@ -43,6 +43,10 @@ blueprint:
             - calendar
           multiple: false
       default: calendar.viewassist
+    view:
+      name: View
+      description: The View Assist dashboard view to use for alarm 
+      default: "/dashboard-viewassist/alarm"      
     alarmsound_path:
       name: Alarm sound path
       description: The path to a sound file to use as the attention device when the
@@ -135,7 +139,13 @@ action:
         target_display_device: '{{ device_id (state_attr(target_satellite_device,
           ''display_device'')) }}'
         target_mediaplayer_device: '{{state_attr(target_satellite_device, ''mediaplayer_device'')}}'
+        view: !input view
       enabled: true
+    - service: browser_mod.navigate
+      data:
+        path: "{{ view }}"
+      target:
+        device_id: "{{target_display_device}}"      
     - service: python_script.set_state
       data:
         entity_id: '{{ target_satellite_device }}'

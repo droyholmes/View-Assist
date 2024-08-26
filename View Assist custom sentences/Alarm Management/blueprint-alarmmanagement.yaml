@@ -54,22 +54,18 @@ blueprint:
       default: http://192.168.0.25:8123/local/viewassist/alarm1.mp3      
 trigger:
   - platform: conversation
-    command:
-    - !input command_setalarm
+    command: !input command_setalarm
     id: setalarm
   - platform: conversation
-    command:
-    - !input command_setreminder
+    command: !input command_setreminder
     id: setreminder
   - platform: state
-    entity_id:
-    - !input calendar_entity
+    entity_id: !input calendar_entity
     enabled: true
     to: 'on'
     id: ringalarm
   - platform: conversation
-    command:
-    - !input command_turnoff
+    command: !input command_turnoff
     id: stopalarm
 condition: []
 action:
@@ -100,94 +96,6 @@ action:
             end_date_time: '{{strptime(today_at().date() ~ '' '' ~ trigger.slots.time,
               ''%Y-%m-%d %I:%M %p'') + timedelta(minutes=1)}}'
           enabled: true
-      - condition: trigger
-        id:
-          - setreminder
-      sequence:
-        - set_conversation_response: Reminder to {{trigger.slots.reminder}} is set for {{trigger.slots.time}}
-        - variables:
-            target_satellite_device: "{% for sat in expand(group_entity) %}\n  {% if (device_id(sat.attributes.mic_device)
-              \ == trigger.device_id) or (device_id(sat.attributes.display_device)  ==
-              trigger.device_id) %}\n    {{ sat.entity_id }}\n  {% endif %}\n{% endfor
-              %}"
-            target_display_device: '{{ device_id(state_attr(target_satellite_device, ''display_device''))
-              }}'
-            target_mediaplayer_device: '{{ state_attr(target_satellite_device, ''mediaplayer_device'')
-              }}'
-          enabled: true
-        - service: calendar.create_event
-          target:
-            entity_id: '{{ calendar_entity }}'
-          data:
-            summary: ASSISTREMINDER,{{target_satellite_device}}
-            start_date_time: '{{strptime(today_at().date() ~ '' '' ~ trigger.slots.time,
-              ''%Y-%m-%d %I:%M %p'')}}'
-            end_date_time: '{{strptime(today_at().date() ~ '' '' ~ trigger.slots.time,
-              ''%Y-%m-%d %I:%M %p'') + timedelta(minutes=1)}}'
-          enabled: true      
-    - conditions:
-      - condition: trigger
-        id:
-          - ringalarm
-      sequence:
-        - variables:
-            target_satellite_device: '{{state_attr(calendar_entity,''message'').split('','')[1]}}'
-            target_display_device: '{{ device_id (state_attr(target_satellite_device,
-              ''display_device'')) }}'
-            target_mediaplayer_device: '{{state_attr(target_satellite_device, ''mediaplayer_device'')}}'
-            view: !input view
-          enabled: true
-        - service: browser_mod.navigate
-          data:
-            path: "{{ view }}"
-          target:
-            device_id: "{{target_display_device}}"      
-        - service: python_script.set_state
-          data:
-            entity_id: '{{ target_satellite_device }}'
-            alarm: active
-            mode: alarm
-        - repeat:
-            sequence:
-            - service: media_player.play_media
-              data:
-                media_content_id: '{{ alarmsound_path }}'
-                media_content_type: music
-              target:
-                entity_id: '{{ target_mediaplayer_device }}'
-              enabled: true
-            - wait_template: '{{ states(target_mediaplayer_device) == ''idle''}}'
-              continue_on_timeout: true
-            while:
-            - condition: template
-              value_template: '{{state_attr(target_satellite_device,''alarm'') == ''active''}}'
-    - conditions:
-      - condition: trigger
-        id:
-          - stopalarm
-      sequence:
-        - variables:
-            target_satellite_device: "{% for sat in expand(group_entity) %}\n  {% if (device_id(sat.attributes.mic_device)
-              \ == trigger.device_id) or (device_id(sat.attributes.display_device)  ==
-              trigger.device_id) %}\n    {{ sat.entity_id }}\n  {% endif %}\n{% endfor
-              %}"
-            target_display_device: '{{ device_id(state_attr(target_satellite_device, ''display_device''))
-              }}'
-            target_mediaplayer_device: '{{ state_attr(target_satellite_device, ''mediaplayer_device'')
-              }}'
-            target_satellite_device_type: '{{ state_attr(target_satellite_device, ''type'')
-              }}'
-          enabled: true
-        - service: python_script.set_state
-          data:
-            entity_id: '{{ target_satellite_device }}'
-            alarm: idle
-        - service: media_player.media_stop
-          target:
-            entity_id:
-              - "{{ target_mediaplayer_device }}"
-          data: {}        
-        - set_conversation_response: ' '
 variables:
   group_entity: !input group_entity
   calendar_entity: !input calendar_entity

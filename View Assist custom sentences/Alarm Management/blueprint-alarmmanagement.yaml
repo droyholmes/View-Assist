@@ -2,7 +2,7 @@ blueprint:
   name: View Assist - Alarm management
   description: Ask Assist to set an alarm and turn it off (View Assist alarmmanagement
     v 1.0.0)
-  domain: automation
+  domain: automation  
   input:
     command_setalarm:
       name: Command Text Set alarm
@@ -51,26 +51,26 @@ blueprint:
       name: Alarm sound path
       description: The path to a sound file to use as the attention device when the
         alarm is ringing
-      default: http://192.168.0.25:8123/local/viewassist/alarm1.mp3
+      default: http://192.168.0.25:8123/local/viewassist/alarm1.mp3      
 trigger:
-- platform: conversation
-  command:
-  - !input command_setalarm
-  id: setalarm
-- platform: conversation
-  command:
-  - !input command_setreminder
-  id: setreminder
-- platform: state
-  entity_id:
-  - !input calendar_entity
-  enabled: true
-  to: 'on'
-  id: ringalarm
-- platform: conversation
-  command:
-  - !input command_turnoff
-  id: stopalarm
+  - platform: conversation
+    command:
+    - !input command_setalarm
+    id: setalarm
+  - platform: conversation
+    command:
+    - !input command_setreminder
+    id: setreminder
+  - platform: state
+    entity_id:
+    - !input calendar_entity
+    enabled: true
+    to: 'on'
+    id: ringalarm
+  - platform: conversation
+    command:
+    - !input command_turnoff
+    id: stopalarm
 condition: []
 action:
   - choose:

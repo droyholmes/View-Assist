@@ -79,7 +79,7 @@ action:
     - conditions:
       - condition: trigger
         id:
-        - setalarm
+          - setalarm
       sequence:
         - set_conversation_response: Alarm set for {{trigger.slots.time}}
         - variables:
@@ -104,7 +104,7 @@ action:
           enabled: true
       - condition: trigger
         id:
-        - setreminder
+          - setreminder
       sequence:
         - set_conversation_response: Reminder to {{trigger.slots.reminder}} is set for {{trigger.slots.time}}
         - variables:
@@ -130,7 +130,7 @@ action:
     - conditions:
       - condition: trigger
         id:
-        - ringalarm
+          - ringalarm
       sequence:
         - variables:
             target_satellite_device: '{{state_attr(calendar_entity,''message'').split('','')[1]}}'
@@ -166,7 +166,7 @@ action:
     - conditions:
       - condition: trigger
         id:
-        - stopalarm
+          - stopalarm
       sequence:
         - variables:
             target_satellite_device: "{% for sat in expand(group_entity) %}\n  {% if (device_id(sat.attributes.mic_device)

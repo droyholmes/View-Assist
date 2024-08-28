@@ -1,0 +1,105 @@
+alias: View Assist - Alarm New
+description: ""
+trigger:
+  - platform: conversation
+    command:
+      - Set an alarm for {time}
+    id: setalarm
+  - platform: state
+    entity_id:
+      - calendar.assist
+    enabled: true
+    to: "on"
+    id: ringalarm
+  - platform: conversation
+    command:
+      - Turn off alarm
+    id: turnoffalarm
+condition: []
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id:
+              - setalarm
+        sequence:
+          - set_conversation_response: Alarm set for {{trigger.slots.time}}
+          - variables:
+              target_satellite_device: |-
+                {% for sat in expand('group.viewassist_satellites') %}
+                  {% if (device_id(sat.attributes.mic_device)  == trigger.device_id) or (device_id(sat.attributes.display_device)  == trigger.device_id) %}
+                    {{ sat.entity_id }}
+                  {% endif %}
+                {% endfor %}
+              target_display_device: >-
+                {{ device_id(state_attr(target_satellite_device,
+                'display_device')) }}
+              target_mediaplayer_device: "{{ state_attr(target_satellite_device, 'mediaplayer_device') }}"
+            enabled: true
+          - target:
+              entity_id: calendar.assist
+            data:
+              summary: ASSISTALARM,{{target_satellite_device}}
+              start_date_time: >-
+                {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                '%Y-%m-%d %I:%M %p')}}
+              end_date_time: >-
+                {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                '%Y-%m-%d %I:%M %p') + timedelta(minutes=1)}}
+            enabled: true
+            action: calendar.create_event
+      - conditions:
+          - condition: trigger
+            id:
+              - ringalarm
+        sequence:
+          - variables:
+              target_satellite_device: "{{state_attr('calendar.assist','message').split(',')[1]}}"
+              target_display_device: >-
+                {{ device_id (state_attr(target_satellite_device,
+                'display_device')) }}
+              target_mediaplayer_device: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
+            enabled: true
+          - data:
+              entity_id: "{{ target_satellite_device }}"
+              alarm: active
+              mode: sticky
+            action: python_script.set_state
+          - data:
+              path: /dashboard-viewassist/alarm
+            target:
+              device_id: "{{target_display_device}}"
+            action: browser_mod.navigate
+          - repeat:
+              sequence:
+                - data:
+                    media_content_id: http://192.168.0.25:8123/local/viewassist/alarm1.mp3
+                    media_content_type: music
+                  target:
+                    entity_id: "{{ target_mediaplayer_device }}"
+                  enabled: true
+                  action: media_player.play_media
+                - wait_template: "{{ states(target_mediaplayer_device) == 'idle'}}"
+                  continue_on_timeout: true
+              while:
+                - condition: template
+                  value_template: "{{state_attr(target_satellite_device,'alarm') == 'active'}}"
+      - conditions:
+          - condition: trigger
+            id:
+              - turnoffalarm
+        sequence:
+          - variables:
+              target_satellite_device: "{{state_attr('calendar.assist','message').split(',')[1]}}"
+              target_display_device: >-
+                {{ device_id (state_attr(target_satellite_device,
+                'display_device')) }}
+              target_mediaplayer_device: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
+            enabled: true
+          - data:
+              entity_id: "{{ target_satellite_device }}"
+              alarm: idle
+              mode: normal
+            action: python_script.set_state
+          - set_conversation_response: ""
+mode: parallel

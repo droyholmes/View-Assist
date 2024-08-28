@@ -7,7 +7,7 @@ trigger:
     id: setalarm
   - platform: state
     entity_id:
-      - calendar.assist
+      - calendar.viewassist
     enabled: true
     to: "on"
     id: ringalarm
@@ -17,6 +17,11 @@ trigger:
     id: turnoffalarm
 condition: []
 action:
+  - variables:
+      group_entity: group.viewassist_satellites
+      calendar_entity: calendar.viewassist
+      alarmsound_path: http://192.168.0.25:8123/local/viewassist/alarm1.mp3
+      view: /dashboard-viewassist/alarm
   - choose:
       - conditions:
           - condition: trigger
@@ -26,7 +31,7 @@ action:
           - set_conversation_response: Alarm set for {{trigger.slots.time}}
           - variables:
               target_satellite_device: |-
-                {% for sat in expand('group.viewassist_satellites') %}
+                {% for sat in expand(group_entity) %}
                   {% if (device_id(sat.attributes.mic_device)  == trigger.device_id) or (device_id(sat.attributes.display_device)  == trigger.device_id) %}
                     {{ sat.entity_id }}
                   {% endif %}
@@ -37,7 +42,7 @@ action:
               target_mediaplayer_device: "{{ state_attr(target_satellite_device, 'mediaplayer_device') }}"
             enabled: true
           - target:
-              entity_id: calendar.assist
+              entity_id: "{{ calendar_entity }}"
             data:
               summary: ASSISTALARM,{{target_satellite_device}}
               start_date_time: >-
@@ -54,7 +59,7 @@ action:
               - ringalarm
         sequence:
           - variables:
-              target_satellite_device: "{{state_attr('calendar.assist','message').split(',')[1]}}"
+              target_satellite_device: "{{state_attr(calendar_entity,'message').split(',')[1]}}"
               target_display_device: >-
                 {{ device_id (state_attr(target_satellite_device,
                 'display_device')) }}
@@ -63,24 +68,27 @@ action:
           - data:
               entity_id: "{{ target_satellite_device }}"
               alarm: active
-              mode: sticky
+              mode: hold
             action: python_script.set_state
           - data:
-              path: /dashboard-viewassist/alarm
+              path: "{{ view }}"
             target:
               device_id: "{{target_display_device}}"
             action: browser_mod.navigate
           - repeat:
               sequence:
                 - data:
-                    media_content_id: http://192.168.0.25:8123/local/viewassist/alarm1.mp3
+                    media_content_id: "{{ alarmsound_path }}"
                     media_content_type: music
                   target:
                     entity_id: "{{ target_mediaplayer_device }}"
                   enabled: true
                   action: media_player.play_media
+                - delay:
+                    seconds: 2
                 - wait_template: "{{ states(target_mediaplayer_device) == 'idle'}}"
                   continue_on_timeout: true
+                  enabled: true
               while:
                 - condition: template
                   value_template: "{{state_attr(target_satellite_device,'alarm') == 'active'}}"
@@ -90,16 +98,21 @@ action:
               - turnoffalarm
         sequence:
           - variables:
-              target_satellite_device: "{{state_attr('calendar.assist','message').split(',')[1]}}"
+              target_satellite_device: "{{state_attr(calendar_entity,'message').split(',')[1]}}"
               target_display_device: >-
                 {{ device_id (state_attr(target_satellite_device,
                 'display_device')) }}
               target_mediaplayer_device: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
+              target_timer_device: "{{ state_attr(target_satellite_device, 'timer') }}"
             enabled: true
           - data:
               entity_id: "{{ target_satellite_device }}"
               alarm: idle
               mode: normal
             action: python_script.set_state
+          - action: timer.finish
+            target:
+              entity_id: "{{ target_timer_device }}"
+            data: {}
           - set_conversation_response: ""
 mode: parallel

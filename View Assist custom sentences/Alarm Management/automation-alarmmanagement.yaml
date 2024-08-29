@@ -5,6 +5,10 @@ trigger:
     command:
       - Set an alarm for {time}
     id: setalarm
+  - platform: conversation
+    command:
+      - Set a reminder to {reminder} at {time}
+    id: setalarm
   - platform: state
     entity_id:
       - calendar.viewassist
@@ -28,7 +32,6 @@ action:
             id:
               - setalarm
         sequence:
-          - set_conversation_response: Alarm set for {{trigger.slots.time}}
           - variables:
               target_satellite_device: |-
                 {% for sat in expand(group_entity) %}
@@ -41,18 +44,40 @@ action:
                 'display_device')) }}
               target_mediaplayer_device: "{{ state_attr(target_satellite_device, 'mediaplayer_device') }}"
             enabled: true
-          - target:
-              entity_id: "{{ calendar_entity }}"
-            data:
-              summary: ASSISTALARM,{{target_satellite_device}}
-              start_date_time: >-
-                {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
-                '%Y-%m-%d %I:%M %p')}}
-              end_date_time: >-
-                {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
-                '%Y-%m-%d %I:%M %p') + timedelta(minutes=1)}}
-            enabled: true
-            action: calendar.create_event
+          - if:
+              - condition: template
+                value_template: "{{ trigger.slots.reminder is defined}}"
+            then:
+              - target:
+                  entity_id: "{{ calendar_entity }}"
+                data:
+                  summary: >-
+                    ASSISTREMINDER,{{target_satellite_device}},{{trigger.slots.reminder}}
+                  start_date_time: >-
+                    {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                    '%Y-%m-%d %I:%M %p')}}
+                  end_date_time: >-
+                    {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                    '%Y-%m-%d %I:%M %p') + timedelta(minutes=1)}}
+                enabled: true
+                action: calendar.create_event
+              - set_conversation_response: >-
+                  I'll remind you to {{trigger.slots.reminder}} at
+                  {{trigger.slots.time}}
+            else:
+              - target:
+                  entity_id: "{{ calendar_entity }}"
+                data:
+                  summary: ASSISTALARM,{{target_satellite_device}}
+                  start_date_time: >-
+                    {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                    '%Y-%m-%d %I:%M %p')}}
+                  end_date_time: >-
+                    {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                    '%Y-%m-%d %I:%M %p') + timedelta(minutes=1)}}
+                enabled: true
+                action: calendar.create_event
+              - set_conversation_response: Alarm set for {{trigger.slots.time}}
       - conditions:
           - condition: trigger
             id:
@@ -64,17 +89,23 @@ action:
                 {{ device_id (state_attr(target_satellite_device,
                 'display_device')) }}
               target_mediaplayer_device: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
+              alarm_type: "{{state_attr(calendar_entity,'message').split(',')[0]}}"
             enabled: true
           - data:
               entity_id: "{{ target_satellite_device }}"
-              alarm: active
-              mode: hold
+              alarm: >-
+                {% if alarm_type == 'ASSISTREMINDER' %}reminding{% else
+                %}alarming{% endif %}
             action: python_script.set_state
           - data:
               path: "{{ view }}"
             target:
               device_id: "{{target_display_device}}"
             action: browser_mod.navigate
+          - data:
+              entity_id: "{{ target_satellite_device }}"
+              mode: hold
+            action: python_script.set_state
           - repeat:
               sequence:
                 - data:
@@ -91,7 +122,10 @@ action:
                   enabled: true
               while:
                 - condition: template
-                  value_template: "{{state_attr(target_satellite_device,'alarm') == 'active'}}"
+                  value_template: >-
+                    {{ (state_attr(target_satellite_device,'alarm') ==
+                    'alarming') or (state_attr(target_satellite_device,'alarm')
+                    == 'reminding') }}
       - conditions:
           - condition: trigger
             id:
@@ -115,4 +149,4 @@ action:
               entity_id: "{{ target_timer_device }}"
             data: {}
           - set_conversation_response: ""
-mode: parallel
+mode: queued

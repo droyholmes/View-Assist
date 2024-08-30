@@ -1,4 +1,4 @@
-alias: View Assist - Alarm New
+alias: View Assist - Alarm Fix
 description: ""
 trigger:
   - platform: conversation
@@ -7,7 +7,11 @@ trigger:
     id: setalarm
   - platform: conversation
     command:
-      - Set a reminder to {reminder} at {time}
+      - (remind me | set a reminder) to {reminder} at {time}
+    id: setalarm
+  - platform: conversation
+    command:
+      - (remind me | set a reminder) to {reminder} in {when}
     id: setalarm
   - platform: state
     entity_id:
@@ -48,22 +52,69 @@ action:
               - condition: template
                 value_template: "{{ trigger.slots.reminder is defined}}"
             then:
-              - target:
-                  entity_id: "{{ calendar_entity }}"
-                data:
-                  summary: >-
-                    ASSISTREMINDER,{{target_satellite_device}},{{trigger.slots.reminder}}
-                  start_date_time: >-
-                    {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
-                    '%Y-%m-%d %I:%M %p')}}
-                  end_date_time: >-
-                    {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
-                    '%Y-%m-%d %I:%M %p') + timedelta(minutes=1)}}
-                enabled: true
-                action: calendar.create_event
-              - set_conversation_response: >-
-                  I'll remind you to {{trigger.slots.reminder}} at
-                  {{trigger.slots.time}}
+              - if:
+                  - condition: template
+                    value_template: "{{ trigger.slots.when is defined}}"
+                then:
+                  - variables:
+                      time_values:
+                        minute: 1
+                        minutes: 1
+                        hour: 60
+                        hours: 60
+                      time_words:
+                        one: 1
+                        two: 2
+                        three: 3
+                        four: 4
+                        five: 5
+                        six: 6
+                        seven: 7
+                        eight: 8
+                        nine: 9
+                      time_int: >-
+                        {% set word = (trigger.slots.when).split(' ')[0] %}{{
+                        time_words[word] if word in time_words else word|int}}
+                      time_type: "{{ (trigger.slots.when).split(' ')[1] }}"
+                      time_start: "{{ time_int * time_values[time_type] }}"
+                      time_end: "{{ time_start + 1 }}"
+                      start_date_time: >-
+                        {{ (now() +
+                        timedelta(minutes=time_start)).strftime('%Y-%m-%d
+                        %H:%M:%S') }}
+                      end_date_time: >-
+                        {{ (now() +
+                        timedelta(minutes=time_end)).strftime('%Y-%m-%d
+                        %H:%M:%S') }}
+                  - target:
+                      entity_id: "{{ calendar_entity }}"
+                    data:
+                      summary: >-
+                        ASSISTREMINDER,{{target_satellite_device}},{{trigger.slots.reminder}}
+                      start_date_time: "{{ start_date_time }}"
+                      end_date_time: "{{ end_date_time }}"
+                    action: calendar.create_event
+                    enabled: true
+                  - set_conversation_response: >-
+                      I'll remind you to {{trigger.slots.reminder}} in
+                      {{trigger.slots.when}}
+                else:
+                  - target:
+                      entity_id: "{{ calendar_entity }}"
+                    data:
+                      summary: >-
+                        ASSISTREMINDER,{{target_satellite_device}},{{trigger.slots.reminder}}
+                      start_date_time: >-
+                        {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                        '%Y-%m-%d %I:%M %p')}}
+                      end_date_time: >-
+                        {{strptime(today_at().date() ~ ' ' ~ trigger.slots.time,
+                        '%Y-%m-%d %I:%M %p') + timedelta(minutes=1)}}
+                    enabled: true
+                    action: calendar.create_event
+                  - set_conversation_response: >-
+                      I'll remind you to {{trigger.slots.reminder}} at
+                      {{trigger.slots.time}}
             else:
               - target:
                   entity_id: "{{ calendar_entity }}"
@@ -97,15 +148,25 @@ action:
                 {% if alarm_type == 'ASSISTREMINDER' %}reminding{% else
                 %}alarming{% endif %}
             action: python_script.set_state
+            enabled: false
           - data:
-              path: "{{ view }}"
+              entity_id: "{{ target_satellite_device }}"
+              alarm: alarming
+              alarm_type: "{{ alarm_type }}"
+              mode: hold
+            action: python_script.set_state
+          - data:
+              entity_id: "{{ target_satellite_device }}"
+              alarm: >-
+                {% if alarm_type == 'ASSISTREMINDER' %}reminding{% else
+                %}alarming{% endif %}
+            action: python_script.set_state
+            enabled: false
+          - data:
+              path: "{{ view }}?variable=value"
             target:
               device_id: "{{target_display_device}}"
             action: browser_mod.navigate
-          - data:
-              entity_id: "{{ target_satellite_device }}"
-              mode: hold
-            action: python_script.set_state
           - repeat:
               sequence:
                 - data:
@@ -149,4 +210,4 @@ action:
               entity_id: "{{ target_timer_device }}"
             data: {}
           - set_conversation_response: ""
-mode: queued
+mode: parallel

@@ -24,6 +24,10 @@ styles:
       - font-weight: bold
       - position: grid
       - color: white
+      - display: >-
+          [[[
+          if(hass.states[variables.var_assistsat_entity].attributes.alarm_type
+          === "ASSISTALARM") return "block"; else return "none";]]]
     snooze:
       - justify-self: center
       - align-self: center
@@ -64,6 +68,7 @@ custom_fields:
         service: python_script.set_state
         service_data:
           alarm: snooze
+          mode: normal
           entity_id: '[[[ return variables.var_assistsat_entity ]]]'
       styles:
         card:
@@ -91,6 +96,7 @@ custom_fields:
         service: python_script.set_state
         service_data:
           alarm: idle
+          mode: normal
           entity_id: '[[[ return variables.var_assistsat_entity ]]]'
       styles:
         card:

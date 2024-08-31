@@ -11,7 +11,9 @@ trigger:
     id: setalarm
   - platform: conversation
     command:
-      - (remind me | set a reminder) to {reminder} in {when}
+      - >-
+        remind me to {reminder} in {when} | set a reminder to {reminder} in
+        {when} | remind me in {when} to {reminder}
     id: setalarm
   - platform: state
     entity_id:
@@ -23,6 +25,14 @@ trigger:
     command:
       - Turn off alarm
     id: turnoffalarm
+  - platform: event
+    event_type: call_service
+    event_data:
+      domain: python_script
+      service: set_state
+      service_data:
+        alarm: snooze
+    id: snooze
 condition: []
 action:
   - variables:
@@ -141,27 +151,18 @@ action:
                 'display_device')) }}
               target_mediaplayer_device: "{{state_attr(target_satellite_device, 'mediaplayer_device')}}"
               alarm_type: "{{state_attr(calendar_entity,'message').split(',')[0]}}"
+              reminder: >-
+                {% if state_attr(calendar_entity,'message').split(',')[2] is
+                defined %}{{ state_attr(calendar_entity,'message').split(',')[2]
+                }}{% endif %}
             enabled: true
           - data:
               entity_id: "{{ target_satellite_device }}"
-              alarm: >-
-                {% if alarm_type == 'ASSISTREMINDER' %}reminding{% else
-                %}alarming{% endif %}
-            action: python_script.set_state
-            enabled: false
-          - data:
-              entity_id: "{{ target_satellite_device }}"
               alarm: alarming
-              alarm_type: "{{ alarm_type }}"
               mode: hold
+              alarm_type: "{{ alarm_type }}"
+              reminder: "{{ reminder }}"
             action: python_script.set_state
-          - data:
-              entity_id: "{{ target_satellite_device }}"
-              alarm: >-
-                {% if alarm_type == 'ASSISTREMINDER' %}reminding{% else
-                %}alarming{% endif %}
-            action: python_script.set_state
-            enabled: false
           - data:
               path: "{{ view }}?variable=value"
             target:
@@ -204,10 +205,54 @@ action:
               entity_id: "{{ target_satellite_device }}"
               alarm: idle
               mode: normal
+              reminder: ""
             action: python_script.set_state
           - action: timer.finish
             target:
               entity_id: "{{ target_timer_device }}"
             data: {}
           - set_conversation_response: ""
+          - data:
+              entity_id: "{{ target_satellite_device }}"
+              alarm: idle
+              mode: normal
+              reminder: ""
+            action: python_script.set_state
+      - conditions:
+          - condition: trigger
+            id:
+              - snooze
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ trigger.event.data.service_data.alarm == \"snooze\" }}"
+            then:
+              - variables:
+                  snooze_time: 1
+                  snooze_begin: "{{ now() + timedelta(minutes=snooze_time) }}"
+                  start_date_time: >-
+                    {{ (snooze_begin|as_datetime).strftime('%Y-%m-%d %H:%M:%S')
+                    }}
+                  end_date_time: >-
+                    {{ (snooze_begin|as_datetime +
+                    timedelta(minutes=1)).strftime('%Y-%m-%d %H:%M:%S') }}
+                  target_satellite_device: "{{ trigger.event.data.service_data.entity_id }}"
+                  alarm_type: "{{ state_attr(target_satellite_device, 'alarm_type') }}"
+                  reminder: "{{ state_attr(target_satellite_device, 'reminder') }}"
+              - data:
+                  entity_id: "{{ target_satellite_device }}"
+                  alarm: idle
+                  mode: normal
+                  reminder: ""
+                action: python_script.set_state
+              - target:
+                  entity_id: "{{ calendar_entity }}"
+                data:
+                  summary: >-
+                    {{ alarm_type }},{{ target_satellite_device }},{{ reminder
+                    }}
+                  start_date_time: "{{ start_date_time }}"
+                  end_date_time: "{{ end_date_time }}"
+                enabled: true
+                action: calendar.create_event
 mode: parallel

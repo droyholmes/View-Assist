@@ -80,15 +80,15 @@ const config = {
           sidebarPath: './sidebars.js',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+          // editUrl:
+          //  'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
         },
         blog: {
           showReadingTime: true,
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+          // editUrl:
+          //  'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
         },
         theme: {
           customCss: './src/css/custom.css',
@@ -130,8 +130,8 @@ const config = {
             title: 'Docs',
             items: [
               {
-                label: 'Satellite Setup',
-                to: '/docs/satellite-configuration',
+                label: 'View Assist Setup',
+                to: '/docs/viewassist-setup',
               },
               {
                 label: 'Extend Voice Functionality',
@@ -143,22 +143,26 @@ const config = {
             title: 'Community',
             items: [
               {
-                label: 'Discord',
+                label: 'View Assist Discord',
                 href: 'https://discord.gg/3WXXfGAf8T',
               },
+              {
+                label: 'View Assist Discussions',
+                href: 'https://github.com/dinki/View-Assist/discussions',
+              },              
             ],
           },
           {
             title: 'More',
             items: [
               {
-                label: 'GitHub',
+                label: 'View Assist GitHub',
                 href: 'https://github.com/dinki/View-Assist',
               },
             ],
           },
         ],
-        copyright: `<p>Find View Assist useful? Consider showing your support: <a href="https://www.buymeacoffee.com/dinki" rel="nofollow"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" id="buyMeACoffee"></a></p> Copyright © ${new Date().getFullYear()} View Assist`,
+        copyright: `<p>Find View Assist useful? Consider showing your support: <a href="https://www.buymeacoffee.com/dinki" rel="nofollow"><br \><br \><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" id="buyMeACoffee"></a></p> Copyright © ${new Date().getFullYear()} View Assist`,
       },
       prism: {
         theme: prismThemes.github,
